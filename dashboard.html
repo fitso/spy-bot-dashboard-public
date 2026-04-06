@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPY ORB Bot V4.1 — Trading Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         background: #0f1117; color: #e4e6ea; min-height: 100vh; }
+
+  .header { background: linear-gradient(135deg, #1a1d29 0%, #0f1117 100%);
+            border-bottom: 1px solid #2a2d3a; padding: 20px 32px; display: flex;
+            justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 22px; font-weight: 600; }
+  .header h1 span { color: #4ade80; }
+  .header .meta { color: #8b8fa3; font-size: 13px; }
+  .header .refresh-btn { background: #2a2d3a; border: 1px solid #3a3d4a; color: #e4e6ea;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .header .refresh-btn:hover { background: #3a3d4a; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+          padding: 24px 32px; }
+
+  .stat-card { background: #1a1d29; border-radius: 12px; padding: 20px;
+               border: 1px solid #2a2d3a; }
+  .stat-card .label { font-size: 12px; color: #8b8fa3; text-transform: uppercase;
+                      letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; }
+  .stat-card .sub { font-size: 12px; color: #8b8fa3; margin-top: 4px; }
+  .green { color: #4ade80; }
+  .red { color: #f87171; }
+  .blue { color: #60a5fa; }
+  .amber { color: #fbbf24; }
+
+  .charts { display: grid; grid-template-columns: 2fr 1fr; gap: 16px;
+            padding: 0 32px 24px; }
+  .chart-card { background: #1a1d29; border-radius: 12px; padding: 20px;
+                border: 1px solid #2a2d3a; }
+  .chart-card h3 { font-size: 14px; color: #8b8fa3; margin-bottom: 16px;
+                   text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+           padding: 0 32px 24px; }
+
+  .trade-log { padding: 0 32px 32px; }
+  .trade-log h3 { font-size: 14px; color: #8b8fa3; text-transform: uppercase;
+                  letter-spacing: 0.5px; margin-bottom: 12px; }
+
+  table { width: 100%; border-collapse: collapse; background: #1a1d29;
+          border-radius: 12px; overflow: hidden; border: 1px solid #2a2d3a; }
+  th { background: #22253a; color: #8b8fa3; font-size: 11px; text-transform: uppercase;
+       letter-spacing: 0.5px; padding: 12px 16px; text-align: left; font-weight: 600; }
+  td { padding: 10px 16px; font-size: 13px; border-top: 1px solid #2a2d3a; }
+  tr:hover td { background: #1f2233; }
+
+  .badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-orb { background: #1e3a5f; color: #60a5fa; }
+  .badge-mpr { background: #1a3d2e; color: #4ade80; }
+  .badge-spike { background: #3d2e1a; color: #fbbf24; }
+  .badge-win { background: #14532d; color: #4ade80; }
+  .badge-loss { background: #450a0a; color: #f87171; }
+
+  .overfit-section { padding: 0 32px 24px; }
+  .overfit-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .alert-banner { background: #3d1a1a; border: 1px solid #7f1d1d; border-radius: 8px;
+                  padding: 12px 16px; margin-bottom: 12px; font-size: 13px; color: #fca5a5;
+                  display: flex; align-items: center; gap: 8px; }
+  .alert-banner.ok { background: #1a3d2e; border-color: #14532d; color: #86efac; }
+  .alert-icon { font-size: 16px; }
+  .benchmark-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .bench-card { background: #22253a; border-radius: 8px; padding: 12px; text-align: center; }
+  .bench-card .strat-name { font-size: 11px; color: #8b8fa3; text-transform: uppercase;
+                            letter-spacing: 0.5px; margin-bottom: 6px; }
+  .bench-card .wr-actual { font-size: 22px; font-weight: 700; }
+  .bench-card .wr-expected { font-size: 11px; color: #8b8fa3; margin-top: 2px; }
+  .bench-card .wr-divergence { font-size: 11px; font-weight: 600; margin-top: 4px; }
+  .bench-card .trades-count { font-size: 10px; color: #6b6f83; margin-top: 4px; }
+
+  .no-data { text-align: center; padding: 80px 32px; color: #8b8fa3; }
+  .no-data h2 { font-size: 24px; margin-bottom: 12px; color: #e4e6ea; }
+  .no-data p { font-size: 14px; max-width: 500px; margin: 0 auto; line-height: 1.6; }
+
+  .footer { text-align: center; padding: 20px; color: #4a4d5a; font-size: 11px;
+            border-top: 1px solid #2a2d3a; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>SPY ORB Bot <span>V4.1</span> — Paper Trading Dashboard</h1>
+    <div class="meta" id="lastUpdate">Loading data...</div>
+  </div>
+  <button class="refresh-btn" onclick="loadData()">Refresh</button>
+</div>
+
+<!-- Stats Row -->
+<div class="grid" id="statsGrid"></div>
+
+<!-- Charts Row 1: Equity + Strategy Pie -->
+<div class="charts" id="chartsRow" style="display:none;">
+  <div class="chart-card">
+    <h3>Equity Curve</h3>
+    <canvas id="equityChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Strategy P&L Breakdown</h3>
+    <canvas id="strategyChart"></canvas>
+  </div>
+</div>
+
+<!-- Charts Row 2: Daily P&L + Drawdown -->
+<div class="row2" id="row2Charts" style="display:none;">
+  <div class="chart-card">
+    <h3>Daily P&L</h3>
+    <canvas id="dailyPnlChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Drawdown</h3>
+    <canvas id="drawdownChart"></canvas>
+  </div>
+</div>
+
+<!-- Overfitting Tracker -->
+<div class="overfit-section" id="overfitSection" style="display:none;">
+  <div id="overfitAlerts"></div>
+  <div class="overfit-row">
+    <div class="chart-card">
+      <h3>Rolling Win Rate vs Backtest (last 20 trades)</h3>
+      <canvas id="overfitChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Strategy Health Check</h3>
+      <div class="benchmark-grid" id="benchmarkCards"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Trade Log -->
+<div class="trade-log" id="tradeLogSection" style="display:none;">
+  <h3>Trade Log</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Strategy</th>
+        <th>Direction</th>
+        <th>Strike</th>
+        <th>Entry</th>
+        <th>Exit</th>
+        <th>Contracts</th>
+        <th>P&L</th>
+        <th>Exit Reason</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody id="tradeLogBody"></tbody>
+  </table>
+</div>
+
+<!-- No data state -->
+<div class="no-data" id="noData">
+  <h2>Waiting for Trading Data</h2>
+  <p>The dashboard will populate automatically once V4.1 completes its first trading day.
+     Data is saved to <code>dashboard_data.json</code> after each session.</p>
+  <p style="margin-top: 16px;">Last checked: <span id="checkTime"></span></p>
+</div>
+
+<div class="footer">
+  SPY ORB Bot V4.1 — 35% TP | 40% Risk | Hybrid MPR Levels | Alpaca Paper Trading
+</div>
+
+<script>
+let equityChartInstance = null;
+let dailyPnlChartInstance = null;
+let drawdownChartInstance = null;
+let strategyChartInstance = null;
+let overfitChartInstance = null;
+
+const CHART_COLORS = {
+  green: '#4ade80', red: '#f87171', blue: '#60a5fa',
+  amber: '#fbbf24', purple: '#a78bfa', grid: '#2a2d3a',
+  greenBg: 'rgba(74,222,128,0.1)', redBg: 'rgba(248,113,113,0.1)',
+};
+
+function formatMoney(n) {
+  if (n == null) return '$0.00';
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function formatPct(n) {
+  if (n == null) return '0.0%';
+  return (n * 100).toFixed(1) + '%';
+}
+
+async function loadData() {
+  document.getElementById('checkTime').textContent = new Date().toLocaleString();
+
+  try {
+    const resp = await fetch('dashboard_data.json?t=' + Date.now());
+    if (!resp.ok) throw new Error('No data file');
+    const data = await resp.json();
+    renderDashboard(data);
+  } catch (e) {
+    document.getElementById('noData').style.display = 'block';
+    document.getElementById('statsGrid').innerHTML = '';
+    document.getElementById('chartsRow').style.display = 'none';
+    document.getElementById('row2Charts').style.display = 'none';
+    document.getElementById('tradeLogSection').style.display = 'none';
+  }
+}
+
+function renderDashboard(data) {
+  document.getElementById('noData').style.display = 'none';
+  document.getElementById('chartsRow').style.display = 'grid';
+  document.getElementById('row2Charts').style.display = 'grid';
+  document.getElementById('tradeLogSection').style.display = 'block';
+
+  const days = data.daily_results || [];
+  const allTrades = data.all_trades || [];
+  const summary = data.summary || {};
+
+  // Last update
+  const lastDay = days.length > 0 ? days[days.length - 1].date : 'N/A';
+  document.getElementById('lastUpdate').textContent =
+    `Last trading day: ${lastDay} | Data updated: ${data.last_updated || 'N/A'}`;
+
+  // ── Stat Cards ──
+  const equity = summary.current_equity || data.starting_capital || 100000;
+  const totalPnl = summary.total_pnl || 0;
+  const totalReturn = summary.total_return_pct || 0;
+  const winRate = summary.win_rate || 0;
+  const profitFactor = summary.profit_factor || 0;
+  const maxDD = summary.max_drawdown_pct || 0;
+  const sharpe = summary.sharpe_ratio || 0;
+  const totalTrades = summary.total_trades || 0;
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Account Equity</div>
+      <div class="value green">${formatMoney(equity)}</div>
+      <div class="sub">${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(1)}% total return</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total P&L</div>
+      <div class="value ${totalPnl >= 0 ? 'green' : 'red'}">${formatMoney(totalPnl)}</div>
+      <div class="sub">${totalTrades} trades over ${days.length} days</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Win Rate</div>
+      <div class="value blue">${(winRate * 100).toFixed(1)}%</div>
+      <div class="sub">Profit Factor: ${profitFactor.toFixed(2)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Max Drawdown</div>
+      <div class="value ${maxDD > -20 ? 'amber' : 'red'}">${maxDD.toFixed(1)}%</div>
+      <div class="sub">Sharpe: ${sharpe.toFixed(2)}</div>
+    </div>
+  `;
+
+  // ── Equity Curve ──
+  const equityCurve = days.map(d => d.equity_eod);
+  const labels = days.map(d => d.date);
+
+  if (equityChartInstance) equityChartInstance.destroy();
+  equityChartInstance = new Chart(document.getElementById('equityChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Equity',
+        data: equityCurve,
+        borderColor: CHART_COLORS.green,
+        backgroundColor: CHART_COLORS.greenBg,
+        fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3', maxTicksLimit: 12 } },
+        y: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3',
+             callback: v => '$' + (v/1000).toFixed(0) + 'K' } },
+      }
+    }
+  });
+
+  // ── Strategy Pie ──
+  const stratPnl = {};
+  allTrades.forEach(t => {
+    const s = t.strategy || 'unknown';
+    stratPnl[s] = (stratPnl[s] || 0) + (t.pnl || 0);
+  });
+
+  if (strategyChartInstance) strategyChartInstance.destroy();
+  strategyChartInstance = new Chart(document.getElementById('strategyChart'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(stratPnl).map(s => s.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())),
+      datasets: [{
+        data: Object.values(stratPnl),
+        backgroundColor: [CHART_COLORS.blue, CHART_COLORS.green, CHART_COLORS.amber, CHART_COLORS.purple],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#8b8fa3', padding: 16 } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + formatMoney(ctx.parsed) } },
+      }
+    }
+  });
+
+  // ── Daily P&L Bar Chart ──
+  const dailyPnls = days.map(d => d.daily_pnl);
+
+  if (dailyPnlChartInstance) dailyPnlChartInstance.destroy();
+  dailyPnlChartInstance = new Chart(document.getElementById('dailyPnlChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Daily P&L',
+        data: dailyPnls,
+        backgroundColor: dailyPnls.map(v => v >= 0 ? CHART_COLORS.green : CHART_COLORS.red),
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3', maxTicksLimit: 12 } },
+        y: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3',
+             callback: v => formatMoney(v) } },
+      }
+    }
+  });
+
+  // ── Drawdown Chart ──
+  let peak = 0;
+  const drawdowns = equityCurve.map(eq => {
+    peak = Math.max(peak, eq);
+    return ((eq - peak) / peak) * 100;
+  });
+
+  if (drawdownChartInstance) drawdownChartInstance.destroy();
+  drawdownChartInstance = new Chart(document.getElementById('drawdownChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Drawdown %',
+        data: drawdowns,
+        borderColor: CHART_COLORS.red,
+        backgroundColor: CHART_COLORS.redBg,
+        fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3', maxTicksLimit: 12 } },
+        y: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3',
+             callback: v => v.toFixed(0) + '%' }, max: 0 },
+      }
+    }
+  });
+
+  // ── Overfitting Tracker ──
+  renderOverfitTracker(data.overfit_tracker);
+
+  // ── Trade Log ──
+  const tbody = document.getElementById('tradeLogBody');
+  const recentTrades = allTrades.slice(-50).reverse();  // Last 50, newest first
+  tbody.innerHTML = recentTrades.map(t => {
+    const pnl = t.pnl || 0;
+    const isWin = pnl > 0;
+    const stratClass = t.strategy === 'orb_breakout' ? 'badge-orb' :
+                       t.strategy === 'mpr_bounce' ? 'badge-mpr' : 'badge-spike';
+    return `<tr>
+      <td>${t.date || ''}</td>
+      <td><span class="badge ${stratClass}">${(t.strategy || '').replace('_', ' ')}</span></td>
+      <td>${t.direction || ''}</td>
+      <td>$${(t.strike || 0).toFixed(0)}</td>
+      <td>$${(t.entry_premium || 0).toFixed(2)}</td>
+      <td>$${(t.exit_premium || 0).toFixed(2)}</td>
+      <td>${t.num_contracts || 0}</td>
+      <td class="${isWin ? 'green' : 'red'}">${formatMoney(pnl)}</td>
+      <td>${t.exit_reason || ''}</td>
+      <td><span class="badge ${isWin ? 'badge-win' : 'badge-loss'}">${isWin ? 'WIN' : 'LOSS'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderOverfitTracker(tracker) {
+  const section = document.getElementById('overfitSection');
+  if (!tracker || !tracker.by_strategy) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  const strategies = ['orb_breakout', 'mpr_bounce', 'spike_fade'];
+  const stratLabels = {'orb_breakout': 'ORB Breakout', 'mpr_bounce': 'MPR Bounce', 'spike_fade': 'Spike Fade'};
+  const stratColors = {'orb_breakout': CHART_COLORS.blue, 'mpr_bounce': CHART_COLORS.green, 'spike_fade': CHART_COLORS.amber};
+
+  // ── Alert banners ──
+  const alertDiv = document.getElementById('overfitAlerts');
+  const alerts = tracker.alerts || [];
+  const totalTrades = strategies.reduce((sum, s) => sum + (tracker.by_strategy[s]?.total_trades || 0), 0);
+
+  if (totalTrades < tracker.rolling_window) {
+    alertDiv.innerHTML = `<div class="alert-banner ok">
+      <span class="alert-icon">&#9432;</span>
+      Collecting data: ${totalTrades} trades so far, need ${tracker.rolling_window} per strategy for reliable rolling comparison
+    </div>`;
+  } else if (alerts.length === 0) {
+    alertDiv.innerHTML = `<div class="alert-banner ok">
+      <span class="alert-icon">&#10003;</span>
+      All strategies within expected range — no overfitting signals detected
+    </div>`;
+  } else {
+    alertDiv.innerHTML = alerts.map(a => `<div class="alert-banner">
+      <span class="alert-icon">&#9888;</span> ${a}
+    </div>`).join('');
+  }
+
+  // ── Rolling win rate line chart ──
+  // Find the longest trade sequence to use as x-axis
+  let maxLen = (tracker.overall_rolling || []).length;
+  const xLabels = Array.from({length: maxLen}, (_, i) => i + 1);
+
+  const datasets = [];
+
+  // Overall rolling
+  if (tracker.overall_rolling && tracker.overall_rolling.length > 0) {
+    datasets.push({
+      label: 'Overall (rolling)',
+      data: tracker.overall_rolling.map(v => (v * 100).toFixed(1)),
+      borderColor: '#e4e6ea',
+      borderWidth: 2.5,
+      pointRadius: 0,
+      tension: 0.3,
+    });
+  }
+
+  // Overall backtest line
+  datasets.push({
+    label: 'Backtest Expected (73%)',
+    data: xLabels.map(() => (tracker.overall_expected * 100).toFixed(1)),
+    borderColor: '#e4e6ea',
+    borderWidth: 1.5,
+    borderDash: [6, 4],
+    pointRadius: 0,
+  });
+
+  // Per-strategy rolling
+  strategies.forEach(strat => {
+    const sd = tracker.by_strategy[strat];
+    if (sd && sd.rolling_win_rate && sd.rolling_win_rate.length > 0) {
+      datasets.push({
+        label: stratLabels[strat] + ' (rolling)',
+        data: sd.rolling_win_rate.map(v => (v * 100).toFixed(1)),
+        borderColor: stratColors[strat],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.3,
+      });
+    }
+  });
+
+  if (overfitChartInstance) overfitChartInstance.destroy();
+  overfitChartInstance = new Chart(document.getElementById('overfitChart'), {
+    type: 'line',
+    data: { labels: xLabels, datasets: datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#8b8fa3', padding: 12, usePointStyle: true, pointStyleWidth: 16 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + '%' } },
+      },
+      scales: {
+        x: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3', maxTicksLimit: 15 },
+             title: { display: true, text: 'Trade #', color: '#6b6f83' } },
+        y: { grid: { color: CHART_COLORS.grid }, ticks: { color: '#8b8fa3', callback: v => v + '%' },
+             min: 0, max: 100, title: { display: true, text: 'Win Rate %', color: '#6b6f83' } },
+      }
+    }
+  });
+
+  // ── Strategy health cards ──
+  const cardsDiv = document.getElementById('benchmarkCards');
+  cardsDiv.innerHTML = strategies.map(strat => {
+    const sd = tracker.by_strategy[strat];
+    if (!sd) return '';
+
+    const actual = sd.current_rolling_wr;
+    const expected = sd.expected_win_rate;
+    const totalStrat = sd.total_trades;
+    const hasEnough = totalStrat >= tracker.rolling_window;
+
+    let actualStr = hasEnough && actual != null ? (actual * 100).toFixed(0) + '%' : '—';
+    let divStr = '';
+    let divClass = '';
+
+    if (hasEnough && sd.divergence != null) {
+      const divPP = (sd.divergence * 100).toFixed(0);
+      const sign = sd.divergence >= 0 ? '+' : '';
+      divStr = sign + divPP + 'pp';
+      divClass = sd.alert ? 'red' : (sd.divergence >= 0 ? 'green' : 'amber');
+    }
+
+    const actualColor = !hasEnough ? '#6b6f83' : (sd.alert ? '#f87171' : '#e4e6ea');
+
+    return `<div class="bench-card">
+      <div class="strat-name">${stratLabels[strat]}</div>
+      <div class="wr-actual" style="color:${actualColor}">${actualStr}</div>
+      <div class="wr-expected">Backtest: ${(expected * 100).toFixed(0)}%</div>
+      ${divStr ? `<div class="wr-divergence ${divClass}">${divStr} divergence</div>` : ''}
+      <div class="trades-count">${totalStrat} trades (${sd.wins}W / ${sd.losses}L)</div>
+    </div>`;
+  }).join('');
+}
+
+// Auto-refresh every 5 minutes
+loadData();
+setInterval(loadData, 300000);
+</script>
+</body>
+</html>
