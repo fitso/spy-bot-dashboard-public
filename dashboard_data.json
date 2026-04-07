@@ -1,6 +1,7 @@
 {
   "starting_capital": 1000.0,
   "daily_results": [],
-  "trades": [],
-  "current_equity": 1000.0
+  "all_trades": [],
+  "summary": {},
+  "last_updated": null
 }
