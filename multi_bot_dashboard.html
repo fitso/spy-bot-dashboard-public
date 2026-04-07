@@ -85,7 +85,9 @@
 <div class="header">
   <div>
     <h1>SPY Trading Bots — <span>Multi-Bot</span> Dashboard</h1>
-    <div class="meta" id="lastUpdate">Loading data...</div>
+    <div class="meta" id="lastUpdate">Loading data...
+      <span id="loadingIndicator" style="color: #fbbf24;">⟳</span>
+    </div>
   </div>
   <button class="refresh-btn" onclick="loadAllData()">Refresh All</button>
 </div>
@@ -123,19 +125,19 @@
   const BOTS = {
     v41: {
       name: 'v4.1 ORB',
-      file: 'spy-orb-bot-v4.1/dashboard_data.json',
+      file: 'dashboard_data.json',
       statsId: 'v41-stats',
       tradesId: 'v41-trades'
     },
     v5: {
       name: 'v5',
-      file: 'spy-orb-bot-v5/dashboard_data_v5.json',
+      file: 'dashboard_data_v5.json',
       statsId: 'v5-stats',
       tradesId: 'v5-trades'
     },
     spike: {
       name: 'Spike Bot',
-      file: 'spike-trading-bot/dashboard_data_spike.json',
+      file: 'dashboard_data_spike.json',
       statsId: 'spike-stats',
       tradesId: 'spike-trades'
     }
@@ -147,14 +149,16 @@
     try {
       for (const [key, bot] of Object.entries(BOTS)) {
         try {
-          const response = await fetch(bot.file);
+          const response = await fetch(bot.file, { cache: 'no-store' });
           if (response.ok) {
             botData[key] = await response.json();
+            console.log(`✓ Loaded ${bot.name} data`);
           } else {
+            console.warn(`Could not load ${bot.name}: ${response.status}`);
             botData[key] = { starting_capital: 0, daily_results: [], all_trades: [], summary: {} };
           }
         } catch (e) {
-          console.log(`Could not load ${bot.name}:`, e.message);
+          console.warn(`Error loading ${bot.name}:`, e.message);
           botData[key] = { starting_capital: 0, daily_results: [], all_trades: [], summary: {} };
         }
       }
@@ -215,11 +219,13 @@
 
     // Render trade log
     if (trades.length === 0) {
+      const timestamp = data.last_updated ? new Date(data.last_updated).toLocaleTimeString() : 'Never';
       document.getElementById(bot.tradesId).innerHTML = `
         <h3>Trade History</h3>
         <div class="no-data">
           <h2>No trades yet</h2>
           <p>Trades will appear here as ${bot.name} executes them.</p>
+          <p style="font-size: 12px; color: #6b6f83; margin-top: 16px;">Last update: ${timestamp}</p>
         </div>
       `;
     } else {
