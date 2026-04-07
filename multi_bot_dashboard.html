@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPY Trading Bots — Multi-Bot Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         background: #0f1117; color: #e4e6ea; min-height: 100vh; }
+
+  .header { background: linear-gradient(135deg, #1a1d29 0%, #0f1117 100%);
+            border-bottom: 1px solid #2a2d3a; padding: 20px 32px; display: flex;
+            justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 24px; font-weight: 600; }
+  .header h1 span { color: #4ade80; }
+  .header .meta { color: #8b8fa3; font-size: 13px; }
+  .header .refresh-btn { background: #2a2d3a; border: 1px solid #3a3d4a; color: #e4e6ea;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .header .refresh-btn:hover { background: #3a3d4a; }
+
+  /* Tabs */
+  .tabs-container { background: #1a1d29; border-bottom: 1px solid #2a2d3a;
+                    padding: 0 32px; display: flex; gap: 0; }
+  .tab-button { background: none; border: none; color: #8b8fa3; padding: 16px 24px;
+                font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent;
+                transition: all 0.2s; font-weight: 500; text-transform: uppercase;
+                letter-spacing: 0.5px; }
+  .tab-button:hover { color: #e4e6ea; }
+  .tab-button.active { color: #4ade80; border-bottom-color: #4ade80; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+          padding: 24px 32px; }
+
+  .stat-card { background: #1a1d29; border-radius: 12px; padding: 20px;
+               border: 1px solid #2a2d3a; }
+  .stat-card .label { font-size: 12px; color: #8b8fa3; text-transform: uppercase;
+                      letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; }
+  .stat-card .sub { font-size: 12px; color: #8b8fa3; margin-top: 4px; }
+  .green { color: #4ade80; }
+  .red { color: #f87171; }
+  .blue { color: #60a5fa; }
+  .amber { color: #fbbf24; }
+
+  .charts { display: grid; grid-template-columns: 2fr 1fr; gap: 16px;
+            padding: 0 32px 24px; }
+  .chart-card { background: #1a1d29; border-radius: 12px; padding: 20px;
+                border: 1px solid #2a2d3a; }
+  .chart-card h3 { font-size: 14px; color: #8b8fa3; margin-bottom: 16px;
+                   text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .trade-log { padding: 0 32px 32px; }
+  .trade-log h3 { font-size: 14px; color: #8b8fa3; text-transform: uppercase;
+                  letter-spacing: 0.5px; margin-bottom: 12px; }
+
+  table { width: 100%; border-collapse: collapse; background: #1a1d29;
+          border-radius: 12px; overflow: hidden; border: 1px solid #2a2d3a; }
+  th { background: #22253a; color: #8b8fa3; font-size: 11px; text-transform: uppercase;
+       letter-spacing: 0.5px; padding: 12px 16px; text-align: left; font-weight: 600; }
+  td { padding: 10px 16px; font-size: 13px; border-top: 1px solid #2a2d3a; }
+  tr:hover td { background: #1f2233; }
+
+  .badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-orb { background: #1e3a5f; color: #60a5fa; }
+  .badge-mpr { background: #1a3d2e; color: #4ade80; }
+  .badge-spike { background: #3d2e1a; color: #fbbf24; }
+  .badge-win { background: #14532d; color: #4ade80; }
+  .badge-loss { background: #450a0a; color: #f87171; }
+
+  .no-data { text-align: center; padding: 60px 32px; color: #8b8fa3; }
+  .no-data h2 { font-size: 20px; margin-bottom: 8px; color: #e4e6ea; }
+  .no-data p { font-size: 13px; }
+
+  .footer { text-align: center; padding: 20px; color: #4a4d5a; font-size: 11px;
+            border-top: 1px solid #2a2d3a; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>SPY Trading Bots — <span>Multi-Bot</span> Dashboard</h1>
+    <div class="meta" id="lastUpdate">Loading data...</div>
+  </div>
+  <button class="refresh-btn" onclick="loadAllData()">Refresh All</button>
+</div>
+
+<!-- Tab Navigation -->
+<div class="tabs-container">
+  <button class="tab-button active" onclick="switchTab('v41')">v4.1 ORB ($1K)</button>
+  <button class="tab-button" onclick="switchTab('v5')">v5 ($2K)</button>
+  <button class="tab-button" onclick="switchTab('spike')">Spike Bot ($200)</button>
+</div>
+
+<!-- V4.1 Tab -->
+<div id="v41" class="tab-content active">
+  <div class="grid" id="v41-stats"></div>
+  <div class="trade-log" id="v41-trades"></div>
+</div>
+
+<!-- V5 Tab -->
+<div id="v5" class="tab-content">
+  <div class="grid" id="v5-stats"></div>
+  <div class="trade-log" id="v5-trades"></div>
+</div>
+
+<!-- Spike Tab -->
+<div id="spike" class="tab-content">
+  <div class="grid" id="spike-stats"></div>
+  <div class="trade-log" id="spike-trades"></div>
+</div>
+
+<div class="footer">
+  Multi-bot dashboard • Updated in real-time • Last refresh: <span id="refreshTime">--</span>
+</div>
+
+<script>
+  const BOTS = {
+    v41: {
+      name: 'v4.1 ORB',
+      file: 'spy-orb-bot-v4.1/dashboard_data.json',
+      statsId: 'v41-stats',
+      tradesId: 'v41-trades'
+    },
+    v5: {
+      name: 'v5',
+      file: 'spy-orb-bot-v5/dashboard_data_v5.json',
+      statsId: 'v5-stats',
+      tradesId: 'v5-trades'
+    },
+    spike: {
+      name: 'Spike Bot',
+      file: 'spike-trading-bot/dashboard_data_spike.json',
+      statsId: 'spike-stats',
+      tradesId: 'spike-trades'
+    }
+  };
+
+  let botData = { v41: {}, v5: {}, spike: {} };
+
+  async function loadAllData() {
+    try {
+      for (const [key, bot] of Object.entries(BOTS)) {
+        try {
+          const response = await fetch(bot.file);
+          if (response.ok) {
+            botData[key] = await response.json();
+          } else {
+            botData[key] = { starting_capital: 0, daily_results: [], all_trades: [], summary: {} };
+          }
+        } catch (e) {
+          console.log(`Could not load ${bot.name}:`, e.message);
+          botData[key] = { starting_capital: 0, daily_results: [], all_trades: [], summary: {} };
+        }
+      }
+      renderAll();
+      updateTimestamp();
+    } catch (e) {
+      console.error('Error loading data:', e);
+    }
+  }
+
+  function renderAll() {
+    renderBot('v41');
+    renderBot('v5');
+    renderBot('spike');
+  }
+
+  function renderBot(botKey) {
+    const bot = BOTS[botKey];
+    const data = botData[botKey];
+    const stats = data.summary || {};
+    const trades = data.all_trades || [];
+    const startCapital = data.starting_capital || 0;
+
+    // Calculate metrics
+    const wins = trades.filter(t => t.pnl > 0).length;
+    const losses = trades.filter(t => t.pnl < 0).length;
+    const totalPnL = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const avgTrade = trades.length > 0 ? (totalPnL / trades.length).toFixed(2) : 0;
+    const winRate = trades.length > 0 ? ((wins / trades.length) * 100).toFixed(1) : 0;
+    const currentEquity = (startCapital + totalPnL).toFixed(2);
+
+    // Render stats
+    const statsHtml = `
+      <div class="stat-card">
+        <div class="label">Starting Capital</div>
+        <div class="value">$${startCapital.toFixed(0)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Current Equity</div>
+        <div class="value ${totalPnL >= 0 ? 'green' : 'red'}">$${currentEquity}</div>
+        <div class="sub ${totalPnL >= 0 ? 'green' : 'red'}">
+          ${totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)}
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Win Rate</div>
+        <div class="value ${winRate >= 50 ? 'green' : 'red'}">${winRate}%</div>
+        <div class="sub">${wins}W / ${losses}L</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Avg Trade</div>
+        <div class="value ${avgTrade >= 0 ? 'green' : 'red'}">$${avgTrade}</div>
+        <div class="sub">${trades.length} trades total</div>
+      </div>
+    `;
+
+    document.getElementById(bot.statsId).innerHTML = statsHtml;
+
+    // Render trade log
+    if (trades.length === 0) {
+      document.getElementById(bot.tradesId).innerHTML = `
+        <h3>Trade History</h3>
+        <div class="no-data">
+          <h2>No trades yet</h2>
+          <p>Trades will appear here as ${bot.name} executes them.</p>
+        </div>
+      `;
+    } else {
+      const tradeRows = trades.slice(-10).reverse().map(t => `
+        <tr>
+          <td>${t.date || '--'}</td>
+          <td><span class="badge ${t.strategy?.toLowerCase() === 'orb' ? 'badge-orb' :
+                                     t.strategy?.toLowerCase() === 'mpr' ? 'badge-mpr' : 'badge-spike'}">
+              ${t.strategy || 'N/A'}</span></td>
+          <td>${t.entry_price?.toFixed(2) || '--'}</td>
+          <td>${t.exit_price?.toFixed(2) || '--'}</td>
+          <td><span class="badge ${t.pnl >= 0 ? 'badge-win' : 'badge-loss'}">
+              ${t.pnl >= 0 ? '+' : ''}${t.pnl?.toFixed(2) || '--'}</span></td>
+        </tr>
+      `).join('');
+
+      document.getElementById(bot.tradesId).innerHTML = `
+        <h3>Recent Trades (Last 10)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Strategy</th>
+              <th>Entry</th>
+              <th>Exit</th>
+              <th>P&L</th>
+            </tr>
+          </thead>
+          <tbody>${tradeRows}</tbody>
+        </table>
+      `;
+    }
+  }
+
+  function switchTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+
+    // Show selected tab
+    document.getElementById(tabName).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function updateTimestamp() {
+    const now = new Date();
+    document.getElementById('refreshTime').textContent = now.toLocaleTimeString();
+  }
+
+  // Auto-refresh every 5 seconds
+  setInterval(loadAllData, 5000);
+
+  // Initial load
+  loadAllData();
+</script>
+
+</body>
+</html>
