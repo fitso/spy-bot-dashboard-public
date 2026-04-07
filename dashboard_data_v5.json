@@ -1,8 +1,92 @@
 {
   "starting_capital": 1000.0,
-  "daily_results": [],
+  "daily_results": [
+    {
+      "date": "2026-04-07",
+      "trades_count": 0,
+      "daily_pnl": 0.0,
+      "equity_eod": 2000.0,
+      "orb_high": null,
+      "orb_low": null
+    }
+  ],
   "all_trades": [],
-  "summary": {},
-  "last_updated": null,
-  "version": "5.0-aggressive"
+  "summary": {
+    "current_equity": 2000.0,
+    "total_pnl": 1000.0,
+    "total_return_pct": 100.0,
+    "total_trades": 0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "win_rate": 0,
+    "avg_win": 0,
+    "avg_loss": 0,
+    "profit_factor": 0,
+    "max_drawdown_pct": 0.0,
+    "sharpe_ratio": 0,
+    "trading_days": 1
+  },
+  "last_updated": "2026-04-07T09:25:39.294123-04:00",
+  "version": "5.0-aggressive",
+  "overfit_tracker": {
+    "benchmarks": {
+      "overall": {
+        "win_rate": 0.73,
+        "profit_factor": 2.53,
+        "sharpe": 5.8,
+        "max_dd_pct": -26.4
+      },
+      "orb_breakout": {
+        "win_rate": 0.72,
+        "avg_pnl_per_trade": 420
+      },
+      "mpr_bounce": {
+        "win_rate": 0.75,
+        "avg_pnl_per_trade": 380
+      },
+      "spike_fade": {
+        "win_rate": 0.7,
+        "avg_pnl_per_trade": 350
+      }
+    },
+    "rolling_window": 20,
+    "by_strategy": {
+      "orb_breakout": {
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "cumulative_win_rate": [],
+        "rolling_win_rate": [],
+        "expected_win_rate": 0.72,
+        "current_rolling_wr": null,
+        "divergence": null,
+        "alert": false
+      },
+      "mpr_bounce": {
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "cumulative_win_rate": [],
+        "rolling_win_rate": [],
+        "expected_win_rate": 0.75,
+        "current_rolling_wr": null,
+        "divergence": null,
+        "alert": false
+      },
+      "spike_fade": {
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "cumulative_win_rate": [],
+        "rolling_win_rate": [],
+        "expected_win_rate": 0.7,
+        "current_rolling_wr": null,
+        "divergence": null,
+        "alert": false
+      }
+    },
+    "overall_rolling": [],
+    "alerts": [],
+    "overall_expected": 0.73
+  }
 }
