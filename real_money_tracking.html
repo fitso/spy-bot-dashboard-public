@@ -1,0 +1,122 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Real Money Tracking — Consolidated Bot</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:24px;max-width:1200px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+h1{margin:0;font-size:28px}
+h1 .live{font-size:12px;background:#da3633;color:#fff;padding:3px 10px;border-radius:12px;vertical-align:middle;margin-left:10px;font-weight:700;letter-spacing:.5px}
+.muted{color:#8b949e;font-size:13px}
+.account{background:linear-gradient(135deg,#1f2937,#161b22);border:1px solid #30363d;border-radius:12px;padding:20px;margin:16px 0 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.account .stat{text-align:center}
+.account .stat .label{color:#8b949e;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.account .stat .val{font-size:24px;font-weight:700}
+.tabs{display:flex;gap:4px;border-bottom:2px solid #30363d;margin-bottom:0}
+.tab{padding:12px 24px;cursor:pointer;background:#161b22;border:1px solid #30363d;border-bottom:none;border-radius:8px 8px 0 0;color:#8b949e;font-weight:600;font-size:14px;transition:all .15s}
+.tab:hover{color:#e6edf3}
+.tab.active{background:#0d1117;color:#58a6ff;border-bottom:2px solid #0d1117;margin-bottom:-2px}
+.tab .badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+.badge.on{background:#238636;color:#fff}
+.badge.off{background:#484f58;color:#c9d1d9}
+.panel{display:none;padding:24px 4px}
+.panel.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+.card .label{color:#8b949e;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.card .val{font-size:22px;font-weight:700}
+.pos{color:#3fb950}.neg{color:#f85149}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 12px;border-bottom:1px solid #30363d;text-align:left}
+th{color:#8b949e;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+tr:hover td{background:#161b22}
+.empty{text-align:center;color:#8b949e;padding:40px;font-style:italic}
+.section-title{font-size:14px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin:24px 0 12px;font-weight:600}
+</style></head><body>
+
+<header>
+  <h1>Real Money Tracking <span class="live">LIVE</span></h1>
+  <div class="muted" id="updated">—</div>
+</header>
+<div class="muted">Consolidated Bot · Single Alpaca live account · Funds segmented per sub-bot</div>
+
+<div class="account" id="account-summary"></div>
+
+<div class="tabs" id="tabs"></div>
+<div id="panels"></div>
+
+<script>
+const SUB_BOTS = ["v4_1","v5","spike"];
+const fmt$ = n => (n>=0?'+$':'-$') + Math.abs(n).toFixed(2);
+const fmtAbs = n => '$' + Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+const cls = n => n>=0?'pos':'neg';
+
+let activeTab = "spike";   // default to spike since it's the first one going live
+
+async function load(){
+  const r = await fetch('dashboard_data_consolidated.json?t='+Date.now(),{cache:'no-store'});
+  const d = await r.json();
+  document.getElementById('updated').textContent =
+    d.last_updated ? 'Updated ' + new Date(d.last_updated).toLocaleTimeString() : 'No data yet';
+
+  // ── Account-wide summary
+  const sb = d.sub_bots || {};
+  const totalEquity = Object.values(sb).reduce((s,b)=>s+(b.equity||0),0);
+  const totalStart  = Object.values(sb).reduce((s,b)=>s+(b.starting_capital||0),0);
+  const totalDay    = Object.values(sb).reduce((s,b)=>s+(b.daily_pnl||0),0);
+  const totalAll    = Object.values(sb).reduce((s,b)=>s+(b.total_pnl||0),0);
+  const totalTrades = Object.values(sb).reduce((s,b)=>s+(b.trades_today||0),0);
+  const totalOpen   = Object.values(sb).reduce((s,b)=>s+(b.open_positions||0),0);
+  const totalRet    = totalStart>0 ? ((totalEquity-totalStart)/totalStart*100) : 0;
+
+  document.getElementById('account-summary').innerHTML = `
+    <div class="stat"><div class="label">Total Equity</div><div class="val">${fmtAbs(totalEquity)}</div></div>
+    <div class="stat"><div class="label">Total Return</div><div class="val ${cls(totalRet)}">${totalRet>=0?'+':''}${totalRet.toFixed(2)}%</div></div>
+    <div class="stat"><div class="label">Today's P&amp;L</div><div class="val ${cls(totalDay)}">${fmt$(totalDay)}</div></div>
+    <div class="stat"><div class="label">All-Time P&amp;L</div><div class="val ${cls(totalAll)}">${fmt$(totalAll)}</div></div>
+    <div class="stat"><div class="label">Trades Today</div><div class="val">${totalTrades}</div></div>
+    <div class="stat"><div class="label">Open Positions</div><div class="val">${totalOpen}</div></div>
+  `;
+
+  // ── Tabs
+  const tabsEl = document.getElementById('tabs');
+  const panelsEl = document.getElementById('panels');
+  tabsEl.innerHTML=''; panelsEl.innerHTML='';
+  SUB_BOTS.forEach(name => {
+    const b = sb[name] || {enabled:false,starting_capital:0,equity:0,daily_pnl:0,total_pnl:0,trades_today:0,open_positions:0};
+    const tab = document.createElement('div');
+    tab.className='tab' + (name===activeTab?' active':'');
+    tab.innerHTML = `${name.toUpperCase()} <span class="badge ${b.enabled?'on':'off'}">${b.enabled?'LIVE':'OFF'}</span>`;
+    tab.onclick = () => { activeTab = name; load(); };
+    tabsEl.appendChild(tab);
+
+    const ret = b.starting_capital>0 ? ((b.equity-b.starting_capital)/b.starting_capital*100) : 0;
+    const trades = (d.all_trades || []).filter(t => t.sub_bot===name).reverse();
+    const panel = document.createElement('div');
+    panel.className='panel' + (name===activeTab?' active':'');
+    panel.innerHTML = `
+      <div class="cards">
+        <div class="card"><div class="label">Starting</div><div class="val">${fmtAbs(b.starting_capital)}</div></div>
+        <div class="card"><div class="label">Equity</div><div class="val ${cls(b.equity-b.starting_capital)}">${fmtAbs(b.equity)}</div></div>
+        <div class="card"><div class="label">Return</div><div class="val ${cls(ret)}">${ret>=0?'+':''}${ret.toFixed(2)}%</div></div>
+        <div class="card"><div class="label">Daily P&amp;L</div><div class="val ${cls(b.daily_pnl)}">${fmt$(b.daily_pnl)}</div></div>
+        <div class="card"><div class="label">Total P&amp;L</div><div class="val ${cls(b.total_pnl)}">${fmt$(b.total_pnl)}</div></div>
+        <div class="card"><div class="label">Trades Today</div><div class="val">${b.trades_today}</div></div>
+        <div class="card"><div class="label">Open Positions</div><div class="val">${b.open_positions}</div></div>
+      </div>
+      <div class="section-title">Trade History (${name})</div>
+      ${trades.length===0
+        ? '<div class="empty">No trades yet.</div>'
+        : `<table><thead><tr><th>Time</th><th>Strategy</th><th>Side</th><th>P&amp;L</th><th>Note</th></tr></thead><tbody>${
+            trades.map(t=>`<tr><td>${new Date(t.ts).toLocaleString()}</td><td>${t.strategy}</td><td>${t.side}</td><td class="${cls(t.pnl)}">${fmt$(t.pnl)}</td><td class="muted">${t.note||''}</td></tr>`).join('')
+          }</tbody></table>`
+      }
+    `;
+    panelsEl.appendChild(panel);
+  });
+}
+
+load();
+setInterval(load, 5000);
+</script>
+</body></html>
