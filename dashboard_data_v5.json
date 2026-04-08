@@ -8,6 +8,14 @@
       "equity_eod": 2000.0,
       "orb_high": null,
       "orb_low": null
+    },
+    {
+      "date": "2026-04-08",
+      "trades_count": 0,
+      "daily_pnl": 0.0,
+      "equity_eod": 2000.0,
+      "orb_high": null,
+      "orb_low": null
     }
   ],
   "all_trades": [],
@@ -23,10 +31,10 @@
     "avg_loss": 0,
     "profit_factor": 0,
     "max_drawdown_pct": 0.0,
-    "sharpe_ratio": 0,
-    "trading_days": 1
+    "sharpe_ratio": 15.874507866387544,
+    "trading_days": 2
   },
-  "last_updated": "2026-04-07T15:30:11.350342-04:00",
+  "last_updated": "2026-04-08T09:53:09.242185-04:00",
   "version": "5.0-aggressive",
   "overfit_tracker": {
     "benchmarks": {
