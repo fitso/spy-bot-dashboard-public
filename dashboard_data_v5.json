@@ -16,13 +16,21 @@
       "equity_eod": 28787.8,
       "orb_high": 677.08,
       "orb_low": 674.75
+    },
+    {
+      "date": "2026-04-09",
+      "trades_count": 0,
+      "daily_pnl": -3651.0,
+      "equity_eod": 46180.56,
+      "orb_high": 675.25,
+      "orb_low": 674.61
     }
   ],
   "all_trades": [],
   "summary": {
-    "current_equity": 28787.8,
-    "total_pnl": 27787.8,
-    "total_return_pct": 2778.78,
+    "current_equity": 46180.56,
+    "total_pnl": 45180.56,
+    "total_return_pct": 4518.056,
     "total_trades": 0,
     "winning_trades": 0,
     "losing_trades": 0,
@@ -31,10 +39,10 @@
     "avg_loss": 0,
     "profit_factor": 0,
     "max_drawdown_pct": 0.0,
-    "sharpe_ratio": 18.43617253471431,
-    "trading_days": 2
+    "sharpe_ratio": 13.36507788085095,
+    "trading_days": 3
   },
-  "last_updated": "2026-04-08T12:46:12.538138-04:00",
+  "last_updated": "2026-04-09T14:34:06.144339-04:00",
   "version": "5.0-aggressive",
   "overfit_tracker": {
     "benchmarks": {
