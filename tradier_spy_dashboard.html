@@ -1,0 +1,324 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Tradier SPY Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#e6edf3}
+
+/* Header */
+.header{background:linear-gradient(135deg,#1a1d29 0%,#0d1117 100%);border-bottom:1px solid #30363d;padding:20px 32px;display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:22px;font-weight:600}
+.header h1 .tag{color:#fbbf24}
+.header h1 .live{font-size:13px;font-weight:500;color:#3fb950;background:#1a3d2e;padding:3px 10px;border-radius:12px;margin-left:10px}
+.header .meta{color:#8b949e;font-size:13px;margin-top:4px}
+.header .right{text-align:right}
+.refresh-btn{background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px}
+.refresh-btn:hover{background:#30363d}
+
+/* Stats row */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:20px 32px}
+.stat{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+.stat .label{font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.stat .value{font-size:22px;font-weight:700}
+.stat .sub{font-size:12px;color:#8b949e;margin-top:4px}
+
+/* Daily P&L table */
+.section{padding:0 32px 24px}
+.section h2{font-size:15px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 12px}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+th,td{padding:10px 14px;border-bottom:1px solid #21262d;text-align:left}
+th{background:#21262d;color:#8b949e;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+tr:hover td{background:#1c2028}
+td.r{text-align:right}
+
+/* Colors */
+.pos{color:#3fb950}.neg{color:#f85149}.muted{color:#8b949e}.white{color:#e6edf3}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-tp{background:#1a3d2e;color:#3fb950}
+.badge-sl{background:#3d1a1a;color:#f85149}
+.badge-fc{background:#3d2e1a;color:#fbbf24}
+.badge-orb{background:#1e3a5f;color:#60a5fa}
+.badge-mpr{background:#1a3d2e;color:#4ade80}
+.badge-spike{background:#3d2e1a;color:#fbbf24}
+
+/* Equity chart placeholder */
+.chart-container{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin:0 32px 24px;min-height:200px}
+
+.footer{text-align:center;padding:20px;color:#484f58;font-size:11px;border-top:1px solid #21262d;margin-top:24px}
+
+/* Responsive */
+@media(max-width:768px){
+  .stats{grid-template-columns:1fr 1fr}
+  .header{flex-direction:column;gap:10px}
+  .section,.stats,.chart-container{padding-left:16px;padding-right:16px;margin-left:0;margin-right:0}
+  table{font-size:12px}
+  th,td{padding:8px 10px}
+}
+</style></head><body>
+
+<div class="header">
+  <div>
+    <h1>SPY Trading Bot <span class="tag">Tradier</span> <span class="live" id="envBadge">LIVE</span></h1>
+    <div class="meta" id="lastUpdate">Loading...</div>
+  </div>
+  <div class="right">
+    <button class="refresh-btn" onclick="load()">Refresh</button>
+  </div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="section">
+  <h2>Equity Curve</h2>
+</div>
+<div class="chart-container">
+  <canvas id="equityChart" height="200"></canvas>
+</div>
+
+<div class="section">
+  <h2>Daily Breakdown</h2>
+  <table id="dailyTable">
+    <thead><tr><th>Date</th><th class="r">Trades</th><th class="r">W / L</th><th class="r">Win Rate</th><th class="r">Daily P&L</th><th class="r">Cumulative</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>All Trades</h2>
+  <table id="tradesTable">
+    <thead><tr><th>Date</th><th>Time</th><th>Contract</th><th>Strategy</th><th>Result</th><th class="r">Qty</th><th class="r">Entry</th><th class="r">Exit</th><th class="r">P&L</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="footer">
+  Tradier SPY Dashboard | Auto-refreshes every 10s | Data from Consolidated-Tradier bot
+</div>
+
+<script>
+const fmt = n => n >= 0 ? `+$${n.toFixed(2)}` : `-$${Math.abs(n).toFixed(2)}`;
+const fmtPct = n => n >= 0 ? `+${n.toFixed(1)}%` : `${n.toFixed(1)}%`;
+const cls = n => n >= 0 ? 'pos' : 'neg';
+
+function parseContract(sym) {
+  const m = sym.match(/SPY(\d{2})(\d{2})(\d{2})([CP])(\d{8})/);
+  if (!m) return sym;
+  const [_, yy, mm, dd, type, strikeRaw] = m;
+  const strike = parseInt(strikeRaw) / 1000;
+  return `$${strike} ${type === 'C' ? 'Call' : 'Put'} ${mm}/${dd}`;
+}
+
+async function load() {
+  try {
+    const r = await fetch('dashboard_data_consolidated_tradier.json?t=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) throw new Error('no data');
+    const d = await r.json();
+    render(d);
+  } catch(e) {
+    document.getElementById('lastUpdate').textContent = 'Failed to load data';
+  }
+}
+
+function render(d) {
+  // Update time
+  if (d.last_updated) {
+    const dt = new Date(d.last_updated);
+    document.getElementById('lastUpdate').textContent = 'Updated ' + dt.toLocaleString();
+  }
+
+  // Filter SPY trades only (closed trades with non-zero pnl)
+  const allTrades = (d.all_trades || []).filter(t =>
+    (t.underlying === 'SPY' || (t.symbol || '').startsWith('SPY'))
+    && t.pnl !== 0
+  );
+
+  // Get v6 sub-bot data
+  const v6 = (d.sub_bots || {}).v6 || {};
+
+  // Compute stats
+  const totalPnl = allTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+  const wins = allTrades.filter(t => t.pnl > 0);
+  const losses = allTrades.filter(t => t.pnl < 0);
+  const winRate = allTrades.length > 0 ? (wins.length / allTrades.length * 100) : 0;
+  const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
+  const startCap = v6.starting_capital || 2000;
+  const equity = v6.equity || (startCap + totalPnl);
+  const returnPct = (equity - startCap) / startCap * 100;
+
+  // Stats cards
+  const statsHtml = [
+    {label:'Starting Capital', value:`$${startCap.toLocaleString()}`, cls:'white'},
+    {label:'Current Equity', value:`$${equity.toLocaleString('en-US',{minimumFractionDigits:2})}`, cls:cls(equity-startCap), sub:fmtPct(returnPct)},
+    {label:'Today P&L', value:fmt(v6.daily_pnl || 0), cls:cls(v6.daily_pnl || 0)},
+    {label:'Total P&L', value:fmt(totalPnl), cls:cls(totalPnl)},
+    {label:'Trades', value:`${allTrades.length}`, cls:'white', sub:`${wins.length}W / ${losses.length}L`},
+    {label:'Win Rate', value:`${winRate.toFixed(1)}%`, cls:winRate >= 50 ? 'pos' : 'neg'},
+    {label:'Avg Win', value:fmt(avgWin), cls:'pos'},
+    {label:'Avg Loss', value:fmt(avgLoss), cls:'neg'},
+  ];
+  document.getElementById('stats').innerHTML = statsHtml.map(s =>
+    `<div class="stat"><div class="label">${s.label}</div><div class="value ${s.cls}">${s.value}</div>${s.sub ? `<div class="sub">${s.sub}</div>` : ''}</div>`
+  ).join('');
+
+  // Group by date for daily breakdown
+  const byDate = {};
+  allTrades.forEach(t => {
+    const date = (t.ts || '').slice(0, 10);
+    if (!date) return;
+    if (!byDate[date]) byDate[date] = {trades:[], pnl:0, wins:0, losses:0};
+    byDate[date].trades.push(t);
+    byDate[date].pnl += t.pnl || 0;
+    if (t.pnl > 0) byDate[date].wins++;
+    else byDate[date].losses++;
+  });
+
+  const dates = Object.keys(byDate).sort();
+  let cumulative = 0;
+  const dailyRows = dates.map(date => {
+    const d = byDate[date];
+    cumulative += d.pnl;
+    const wr = d.trades.length > 0 ? (d.wins / d.trades.length * 100) : 0;
+    return `<tr>
+      <td>${date}</td>
+      <td class="r">${d.trades.length}</td>
+      <td class="r">${d.wins}W / ${d.losses}L</td>
+      <td class="r ${wr >= 50 ? 'pos' : 'neg'}">${wr.toFixed(0)}%</td>
+      <td class="r ${cls(d.pnl)}">${fmt(d.pnl)}</td>
+      <td class="r ${cls(cumulative)}">${fmt(cumulative)}</td>
+    </tr>`;
+  });
+  document.querySelector('#dailyTable tbody').innerHTML = dailyRows.join('');
+
+  // All trades table (newest first)
+  const tradeRows = allTrades.slice().reverse().map(t => {
+    const ts = t.ts ? new Date(t.ts) : null;
+    const date = ts ? ts.toLocaleDateString() : '';
+    const time = ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+    const contract = parseContract(t.symbol || '');
+    const strat = (t.strategy || '').replace(/_/g, ' ');
+    const stratClass = strat.includes('orb') ? 'badge-orb' : strat.includes('mpr') ? 'badge-mpr' : 'badge-spike';
+    const reason = t.exit_reason || t.note || '';
+    const resultClass = reason === 'take_profit' ? 'badge-tp' : reason === 'force_close' ? 'badge-fc' : 'badge-sl';
+    const resultLabel = reason === 'take_profit' ? 'TP' : reason === 'force_close' ? 'FC' : reason === 'stop_loss' ? 'SL' : reason;
+    return `<tr>
+      <td>${date}</td>
+      <td>${time}</td>
+      <td>${contract}</td>
+      <td><span class="badge ${stratClass}">${strat}</span></td>
+      <td><span class="badge ${resultClass}">${resultLabel}</span></td>
+      <td class="r">${t.num_contracts || ''}</td>
+      <td class="r">${t.entry_premium ? '$'+t.entry_premium.toFixed(2) : ''}</td>
+      <td class="r">${t.exit_premium ? '$'+t.exit_premium.toFixed(2) : ''}</td>
+      <td class="r ${cls(t.pnl)}">${fmt(t.pnl)}</td>
+    </tr>`;
+  });
+  document.querySelector('#tradesTable tbody').innerHTML = tradeRows.join('');
+
+  // Equity curve
+  drawEquityChart(dates, byDate, startCap);
+}
+
+function drawEquityChart(dates, byDate, startCap) {
+  const canvas = document.getElementById('equityChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 200 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '200px';
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = 200;
+  const pad = {top:20, right:60, bottom:30, left:60};
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  // Build equity series
+  let eq = startCap;
+  const points = [{date: 'Start', equity: eq}];
+  dates.forEach(d => {
+    eq += byDate[d].pnl;
+    points.push({date: d, equity: eq});
+  });
+
+  const minEq = Math.min(...points.map(p => p.equity)) - 50;
+  const maxEq = Math.max(...points.map(p => p.equity)) + 50;
+
+  const xScale = i => pad.left + (i / (points.length - 1)) * plotW;
+  const yScale = v => pad.top + (1 - (v - minEq) / (maxEq - minEq)) * plotH;
+
+  // Grid
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = pad.top + (i / 4) * plotH;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    const val = maxEq - (i / 4) * (maxEq - minEq);
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('$' + val.toFixed(0), pad.left - 8, y + 4);
+  }
+
+  // Starting capital line
+  const startY = yScale(startCap);
+  ctx.strokeStyle = '#484f58';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(pad.left, startY); ctx.lineTo(W - pad.right, startY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Equity line
+  ctx.strokeStyle = points[points.length-1].equity >= startCap ? '#3fb950' : '#f85149';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = xScale(i), y = yScale(p.equity);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Fill area under
+  const gradient = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
+  const isUp = points[points.length-1].equity >= startCap;
+  gradient.addColorStop(0, isUp ? 'rgba(63,185,80,0.15)' : 'rgba(248,81,73,0.15)');
+  gradient.addColorStop(1, 'rgba(13,17,23,0)');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = xScale(i), y = yScale(p.equity);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(xScale(points.length - 1), H - pad.bottom);
+  ctx.lineTo(xScale(0), H - pad.bottom);
+  ctx.closePath();
+  ctx.fill();
+
+  // Dots
+  points.forEach((p, i) => {
+    if (i === 0) return;
+    const x = xScale(i), y = yScale(p.equity);
+    ctx.fillStyle = '#e6edf3';
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // Date labels
+  ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  points.forEach((p, i) => {
+    if (i === 0) return;
+    const x = xScale(i);
+    const label = p.date.slice(5); // MM-DD
+    ctx.fillText(label, x, H - pad.bottom + 16);
+  });
+
+  // End value label
+  const lastP = points[points.length - 1];
+  ctx.fillStyle = isUp ? '#3fb950' : '#f85149';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('$' + lastP.equity.toFixed(0), xScale(points.length - 1) + 8, yScale(lastP.equity) + 4);
+}
+
+load();
+setInterval(load, 10000);
+</script>
+</body></html>

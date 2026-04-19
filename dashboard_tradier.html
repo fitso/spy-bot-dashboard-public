@@ -1,0 +1,146 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Dashboard Testing - Tradier</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:0}
+.header{background:linear-gradient(135deg,#1a1d29 0%,#0d1117 100%);border-bottom:1px solid #30363d;padding:20px 32px;display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:22px;font-weight:600;margin:0}
+.header h1 .tag{color:#fbbf24}
+.header h1 .env{font-size:13px;font-weight:400;color:#f97316;background:#3d2e1a;padding:3px 10px;border-radius:12px;margin-left:10px}
+.header .meta{color:#8b949e;font-size:13px;margin-top:4px}
+.header .right{text-align:right}
+.header .refresh-btn{background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px}
+.header .refresh-btn:hover{background:#30363d}
+.acct-bar{background:#161b22;border-bottom:1px solid #30363d;padding:12px 32px;display:flex;gap:32px;font-size:13px}
+.acct-bar .item{display:flex;gap:6px}.acct-bar .label{color:#8b949e}.acct-bar .val{color:#e6edf3;font-weight:600}
+.acct-bar .val.amber{color:#fbbf24}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;padding:24px 32px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px}
+.card h2{margin:0 0 12px;font-size:18px;color:#58a6ff}
+.row{display:flex;justify-content:space-between;margin:6px 0;font-size:14px}
+.pos{color:#3fb950}.neg{color:#f85149}.muted{color:#8b949e}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.on{background:#238636;color:#fff}.off{background:#484f58;color:#fff}
+.section{padding:0 32px 24px}
+.section h2{font-size:16px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 12px}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+th,td{padding:10px 14px;border-bottom:1px solid #21262d;text-align:left}
+th{background:#21262d;color:#8b949e;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+tr:hover td{background:#1c2028}
+.badge-orb{background:#1e3a5f;color:#60a5fa}
+.badge-mpr{background:#1a3d2e;color:#4ade80}
+.badge-spike{background:#3d2e1a;color:#fbbf24}
+.no-data{text-align:center;padding:80px 32px;color:#8b949e}
+.no-data h2{font-size:22px;margin-bottom:10px;color:#e6edf3}
+.no-data p{font-size:14px;max-width:520px;margin:0 auto;line-height:1.6}
+.footer{text-align:center;padding:20px;color:#484f58;font-size:11px;border-top:1px solid #21262d;margin-top:24px}
+</style></head><body>
+
+<div class="header">
+  <div>
+    <h1>Consolidated Trading Bot <span class="tag">Tradier</span> <span class="env">SANDBOX</span></h1>
+    <div class="meta" id="lastUpdate">Loading data...</div>
+  </div>
+  <div class="right">
+    <button class="refresh-btn" onclick="load()">Refresh</button>
+  </div>
+</div>
+
+<div class="acct-bar">
+  <div class="item"><span class="label">Broker:</span><span class="val">Tradier (sandbox)</span></div>
+  <div class="item"><span class="label">Account:</span><span class="val">VA12784466</span></div>
+  <div class="item"><span class="label">Data Feed:</span><span class="val amber">Alpaca SIP (real-time)</span></div>
+  <div class="item"><span class="label">Paper Equity:</span><span class="val" id="totalEquity">$100,000</span></div>
+</div>
+
+<div id="cards" class="grid"></div>
+
+<div class="section">
+  <h2>Recent Trades</h2>
+  <table id="trades">
+    <thead><tr>
+      <th>Time</th><th>Sub-Bot</th><th>Strategy</th><th>Side</th><th>Symbol</th><th>Contracts</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>Exit Reason</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="no-data" id="noData">
+  <h2>Waiting for Trading Data</h2>
+  <p>The dashboard will populate once the Consolidated-Tradier bot completes its first trades.
+     Data is written to <code>dashboard_data_consolidated_tradier.json</code> each session.</p>
+  <p style="margin-top:14px">Hybrid setup: Alpaca SIP real-time data + Tradier REST order execution</p>
+</div>
+
+<div class="footer">
+  Dashboard Testing - Tradier | Hybrid: Alpaca SIP Data + Tradier Orders | Sandbox Paper Trading
+</div>
+
+<script>
+const fmt = n => n >= 0 ? `+$${n.toFixed(2)}` : `-$${Math.abs(n).toFixed(2)}`;
+const cls = n => n >= 0 ? 'pos' : 'neg';
+
+async function load() {
+  try {
+    const r = await fetch('dashboard_data_consolidated_tradier.json?t=' + Date.now(), {cache: 'no-store'});
+    if (!r.ok) throw new Error('no data');
+    const d = await r.json();
+    render(d);
+  } catch (e) {
+    document.getElementById('noData').style.display = 'block';
+    document.getElementById('cards').innerHTML = '';
+    document.querySelector('#trades tbody').innerHTML = '';
+  }
+}
+
+function render(d) {
+  document.getElementById('noData').style.display = 'none';
+  document.getElementById('lastUpdate').textContent = d.last_updated
+    ? 'Updated ' + new Date(d.last_updated).toLocaleString()
+    : '';
+
+  // Total equity across all sub-bots
+  let totalEq = 0;
+
+  const cards = document.getElementById('cards');
+  cards.innerHTML = '';
+
+  for (const [name, sb] of Object.entries(d.sub_bots || {})) {
+    totalEq += sb.equity || sb.starting_capital || 0;
+    const pct = ((sb.equity - sb.starting_capital) / sb.starting_capital * 100);
+    cards.insertAdjacentHTML('beforeend', `<div class="card">
+      <h2>${name.toUpperCase()} <span class="badge ${sb.enabled ? 'on' : 'off'}">${sb.enabled ? 'LIVE' : 'OFF'}</span></h2>
+      <div class="row"><span class="muted">Starting</span><span>$${sb.starting_capital.toLocaleString('en-US', {minimumFractionDigits: 2})}</span></div>
+      <div class="row"><span class="muted">Equity</span><span class="${cls(sb.equity - sb.starting_capital)}">$${sb.equity.toLocaleString('en-US', {minimumFractionDigits: 2})} (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)</span></div>
+      <div class="row"><span class="muted">Daily P&L</span><span class="${cls(sb.daily_pnl)}">${fmt(sb.daily_pnl)}</span></div>
+      <div class="row"><span class="muted">Total P&L</span><span class="${cls(sb.total_pnl)}">${fmt(sb.total_pnl)}</span></div>
+      <div class="row"><span class="muted">Trades today</span><span>${sb.trades_today}</span></div>
+      <div class="row"><span class="muted">Open positions</span><span>${sb.open_positions}</span></div>
+    </div>`);
+  }
+
+  document.getElementById('totalEquity').textContent = '$' + totalEq.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+  const tb = document.querySelector('#trades tbody');
+  tb.innerHTML = '';
+  (d.all_trades || []).slice().reverse().forEach(t => {
+    const stratClass = (t.strategy || '').includes('orb') ? 'badge-orb'
+                     : (t.strategy || '').includes('mpr') ? 'badge-mpr' : 'badge-spike';
+    tb.insertAdjacentHTML('beforeend', `<tr>
+      <td>${t.ts ? new Date(t.ts).toLocaleString() : ''}</td>
+      <td>${t.sub_bot || ''}</td>
+      <td><span class="badge ${stratClass}">${(t.strategy || '').replace(/_/g, ' ')}</span></td>
+      <td>${t.side || ''}</td>
+      <td class="muted">${t.symbol || ''}</td>
+      <td>${t.num_contracts || ''}</td>
+      <td>$${(t.entry_premium || 0).toFixed(2)}</td>
+      <td>$${(t.exit_premium || 0).toFixed(2)}</td>
+      <td class="${cls(t.pnl)}">${fmt(t.pnl || 0)}</td>
+      <td class="muted">${t.exit_reason || t.note || ''}</td>
+    </tr>`);
+  });
+}
+
+load();
+setInterval(load, 5000);
+</script>
+</body></html>
